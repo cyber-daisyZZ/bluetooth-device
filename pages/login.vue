@@ -118,7 +118,7 @@ export default {
     loginSuccess(result) {
       // 设置用户信息
       this.$store.dispatch('GetInfo').then(res => {
-        this.$tab.reLaunch('/pages/index')
+        this.$tab.reLaunch('/pages/device/device')
       })
     }
   }

@@ -1,25 +1,26 @@
 {
-    "name": "One Reader",
-    "appid": "__UNI__25A9D80",
-    "description": "",
-    "versionName": "1.2.0",
-    "versionCode": "100",
-    "transformPx": false,
-    "app-plus": {
-        "usingComponents": true,
-        "nvueCompiler": "uni-app",
-        "splashscreen": {
-            "alwaysShowBeforeRender": true,
-            "waiting": true,
-            "autoclose": true,
-            "delay": 0
+    "name" : "One Reader",
+    "appid" : "__UNI__0959BB5",
+    "description" : "",
+    "versionName" : "1.2.0",
+    "versionCode" : "100",
+    "transformPx" : false,
+    "app-plus" : {
+        "usingComponents" : true,
+        "nvueCompiler" : "uni-app",
+        "splashscreen" : {
+            "alwaysShowBeforeRender" : true,
+            "waiting" : true,
+            "autoclose" : true,
+            "delay" : 0
         },
-        "modules": {
-            "Bluetooth": {}
+        "modules" : {
+            "Bluetooth" : {},
+            "Geolocation" : {}
         },
-        "distribute": {
-            "android": {
-                "permissions": [
+        "distribute" : {
+            "android" : {
+                "permissions" : [
                     "<uses-permission android:name=\"android.permission.CHANGE_NETWORK_STATE\"/>",
                     "<uses-permission android:name=\"android.permission.MOUNT_UNMOUNT_FILESYSTEMS\"/>",
                     "<uses-permission android:name=\"android.permission.VIBRATE\"/>",
@@ -38,50 +39,58 @@
                     "<uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\"/>",
                     "<uses-permission android:name=\"android.permission.BLUETOOTH\"/>",
                     "<uses-permission android:name=\"android.permission.BLUETOOTH_ADMIN\"/>",
-                    "<uses-permission android:name=\"android.permission.BLUETOOTH_PRIVILEGED\"/>",
-                    "<uses-permission android:name=\"android.permission.BLUETOOTH\"/>",
-                    "<uses-permission android:name=\"android.permission.BLUETOOTH_ADMIN\"/>"
+                    "<uses-permission android:name=\"android.permission.BLUETOOTH_PRIVILEGED\"/>"
                 ]
             },
-            "ios": {
-                "privacyDescription": {
-                    "NSLocationAlwaysAndWhenInUseUsageDescription": "用于获取GPS位置信息，记录数据采集的地理位置",
-                    "NSBluetoothPeripheralUsageDescription": "用于连接蓝牙传感器设备，读取浓度数据",
-                    "NSBluetoothAlwaysUsageDescription": "用于后台连接蓝牙设备，持续监控数据"
+            "ios" : {
+                "privacyDescription" : {
+                    "NSLocationAlwaysAndWhenInUseUsageDescription" : "用于获取GPS位置信息，记录数据采集的地理位置",
+                    "NSBluetoothPeripheralUsageDescription" : "用于连接蓝牙传感器设备，读取浓度数据",
+                    "NSBluetoothAlwaysUsageDescription" : "用于后台连接蓝牙设备，持续监控数据"
                 },
-                "UIBackgroundModes": [
-                    "bluetooth-central",
-                    "fetch"
-                ]
+                "UIBackgroundModes" : [ "bluetooth-central", "fetch" ],
+                "dSYMs" : false
             },
-            "sdkConfigs": {}
+            "sdkConfigs" : {
+                "maps" : {},
+                "geolocation" : {
+                    "system" : {
+                        "__platform__" : [ "ios", "android" ]
+                    }
+                }
+            },
+            "icons" : {
+                "android" : {
+                    "xxhdpi" : "/Users/rhys/Downloads/化学.png"
+                }
+            }
         }
     },
-    "quickapp": {},
-    "mp-weixin": {
-        "appid": "wxccd7e2a0911b3397",
-        "setting": {
-            "urlCheck": false,
-            "es6": false,
-            "minified": true,
-            "postcss": true
+    "quickapp" : {},
+    "mp-weixin" : {
+        "appid" : "wxccd7e2a0911b3397",
+        "setting" : {
+            "urlCheck" : false,
+            "es6" : false,
+            "minified" : true,
+            "postcss" : true
         },
-        "optimization": {
-            "subPackages": true
+        "optimization" : {
+            "subPackages" : true
         },
-        "usingComponents": true
+        "usingComponents" : true
     },
-    "vueVersion": "2",
-    "h5": {
-        "template": "static/index.html",
-        "devServer": {
-            "port": 9090,
-            "https": false
+    "vueVersion" : "2",
+    "h5" : {
+        "template" : "static/index.html",
+        "devServer" : {
+            "port" : 9090,
+            "https" : false
         },
-        "title": "RuoYi-App",
-        "router": {
-            "mode": "hash",
-            "base": "./"
+        "title" : "One Reader",
+        "router" : {
+            "mode" : "hash",
+            "base" : "./"
         }
     }
 }

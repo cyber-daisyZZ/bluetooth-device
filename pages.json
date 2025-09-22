@@ -25,19 +25,19 @@
       }
     },
     {
-      "path": "pages/work/index",
+      "path": "pages/market-info/market-info",
       "style": {
         "navigationBarTitleText": "行业信息"
       }
     },
     {
-      "path": "pages/work/index",
+      "path": "pages/computing/computing",
       "style": {
         "navigationBarTitleText": "计算板块"
       }
     },
     {
-      "path": "pages/work/index",
+      "path": "pages/test-unit/test-unit",
       "style": {
         "navigationBarTitleText": "测试单元"
       }

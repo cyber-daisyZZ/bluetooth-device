@@ -14,10 +14,17 @@
 					<text class="device-name">已连接: {{ bluetoothDeviceName }}</text>
 					<button class="disconnect-btn" @click="handleDisconnect">断开连接</button>
 				</view>
+				<view v-if="showScanDeviceList" class="bluetooth-device-list">
+					<view v-for="device in scanDeviceList" :key="device.id" class="bluetooth-device-item">
+						<text class="bluetooth-name">{{ device.name || device.deviceId }}</text>
+						<button class="connect-btn" @click="selectScanDevice(device)">连接</button>
+					</view>
+				</view>
 				<view class="data-display">
 					<text class="label">浓度值 (C0):</text>
 					<text class="value">{{ concentrationValue }}</text>
 				</view>
+				<button v-if="isBluetoothConnected" class="action-btn" @click="getDeviceService">获取设备服务</button>
 			</view>
 		</view>
 
@@ -32,7 +39,7 @@
 					<text class="subsection-title">分组</text>
 					<view class="input-grid">
 						<view class="input-row">
-							<view class="input-item">
+							<view class="input-item mr-20">
 								<text class="input-label">C01</text>
 								<input v-model="groupData.C01" class="input-field" type="number" placeholder="0" />
 							</view>
@@ -42,7 +49,7 @@
 							</view>
 						</view>
 						<view class="input-row">
-							<view class="input-item">
+							<view class="input-item mr-20">
 								<text class="input-label">C03</text>
 								<input v-model="groupData.C03" class="input-field" type="number" placeholder="0" />
 							</view>
@@ -52,7 +59,7 @@
 							</view>
 						</view>
 						<view class="input-row">
-							<view class="input-item">
+							<view class="input-item mr-20">
 								<text class="input-label">C05</text>
 								<input v-model="groupData.C05" class="input-field" type="number" placeholder="0" />
 							</view>
@@ -70,6 +77,10 @@
 				<view class="data-display">
 					<text class="label">GPS:</text>
 					<text class="value">{{ gpsLocation }}</text>
+				</view>
+				<view v-if="gpsError" class="data-display">
+					<text class="label">GPS ERROR</text>
+					<text class="value" @click="initGPS">{{ gpsError }}</text>
 				</view>
 			</view>
 		</view>
@@ -132,6 +143,7 @@ export default {
 			timeInterval: null,
 
 			// GPS位置
+			gpsError: '',
 			gpsLocation: '--',
 			watchId: null,
 
@@ -143,7 +155,13 @@ export default {
 
 			// 蓝牙设备列表
 			deviceList: [],
-			showDeviceList: false
+			showDeviceList: false,
+
+			// IOS ANDROID
+			scanDeviceList: [],
+			showScanDeviceList: false,
+			scanResolve: null,
+			scanReject: null,
 		}
 	},
 	onLoad() {
@@ -185,12 +203,13 @@ export default {
 		initGPS() {
 			// #ifdef APP-PLUS
 			uni.getLocation({
-				type: 'gcj02',
+				type: 'wgs84',
 				success: (res) => {
 					this.updateGPSLocation(res.latitude, res.longitude);
 				},
 				fail: (err) => {
 					console.log('GPS获取失败:', err);
+					this.gpsError = err
 					this.gpsLocation = 'GPS获取失败';
 				}
 			});
@@ -204,6 +223,7 @@ export default {
 				},
 				fail: (err) => {
 					console.log('GPS监听启动失败:', err);
+					this.gpsError = err;
 				}
 			});
 			// #endif
@@ -215,6 +235,7 @@ export default {
 				}, (error) => {
 					console.log('GPS获取失败:', error);
 					this.gpsLocation = 'GPS获取失败';
+					this.gpsError = error.message;
 				});
 			} else {
 				this.gpsLocation = '浏览器不支持GPS';
@@ -230,6 +251,7 @@ export default {
 			const lngMin = Math.floor((longitude - lngDeg) * 60);
 
 			this.gpsLocation = `北纬${latDeg}度${latMin}分,东经${lngDeg}度${lngMin}分`;
+			this.gpsError = '';
 		},
 
 		// 检查蓝牙状态
@@ -255,15 +277,31 @@ export default {
 			}
 		},
 
+		selectScanDevice(device) {
+			this.scanResolve([device]);
+			this.showScanDeviceList = false;
+			this.scanDeviceList = [];
+			this.scanResolve = null;
+			this.scanReject = null;
+			uni.stopBluetoothDevicesDiscovery();
+		},
+
 		// 连接蓝牙
 		async connectBluetooth() {
+			this.scanDeviceList = [];
 			try {
 				uni.showLoading({
 					title: '扫描设备中...'
 				});
 
 				// 扫描蓝牙设备
-				const devices = await bluetoothManager.scanDevices();
+				const devices = await bluetoothManager.scanDevices((device, resolve, reject) => {
+					this.scanDeviceList.push(device);
+					uni.hideLoading();
+					this.showScanDeviceList = true;
+					this.scanResolve = resolve;
+					this.scanReject = reject;
+				});
 				this.deviceList = devices;
 
 				uni.hideLoading();
@@ -276,48 +314,23 @@ export default {
 					});
 					return;
 				}
-
 				// 显示设备选择列表
 				this.showDeviceSelection();
-
 			} catch (error) {
 				uni.hideLoading();
 				console.log('蓝牙连接失败:', error);
 
-				// 显示平台特定的提示
-				// #ifdef APP-PLUS
-				uni.getSystemInfo({
-					success: (res) => {
-						if (res.platform === 'android') {
-							uni.showModal({
-								title: '连接失败',
-								content: error,
-								showCancel: false
-							});
-						} else if (res.platform === 'ios') {
-							uni.showModal({
-								title: '连接失败',
-								content: error,
-								showCancel: false
-							});
-						}
-					}
-				});
-				// #endif
-
-				// #ifdef H5
 				uni.showModal({
 					title: '连接失败',
 					content: error,
 					showCancel: false
 				});
-				// #endif
 			}
 		},
 
 		// 显示设备选择
 		showDeviceSelection() {
-			const deviceNames = this.deviceList.map(device => device.name);
+			const deviceNames = this.deviceList.map(device => device.name || device.deviceId);
 
 			uni.showActionSheet({
 				itemList: deviceNames,
@@ -338,16 +351,14 @@ export default {
 					title: '连接中...'
 				});
 
-				const result = await bluetoothManager.connectDevice(device.gatt);
+				const result = await bluetoothManager.connectDevice(device);
 
 				uni.hideLoading();
 
 				if (result.success) {
 					this.isBluetoothConnected = true;
 					this.bluetoothDeviceId = result.deviceId;
-					this.bluetoothDeviceName = result.deviceName;
-
-					console.log(result);
+					this.bluetoothDeviceName = result.name || result.deviceId;
 
 					uni.showToast({
 						title: '连接成功',
@@ -362,6 +373,27 @@ export default {
 					icon: 'error'
 				});
 			}
+		},
+
+		getDeviceService() {
+			uni.getBLEDeviceServices({
+				deviceId: this.bluetoothDeviceId,
+				success(res) {
+					console.log(res)
+					uni.showModal({
+						title: '设备服务',
+						content: JSON.stringify(res),
+						showCancel: false
+					});
+				},
+				fail(err) {
+					console.error(err)
+					uni.showToast({
+						title: '获取设备服务失败',
+						icon: 'error'
+					});
+				}
+			})
 		},
 
 		// 开始读取数据
@@ -467,7 +499,8 @@ export default {
 				const average = values.reduce((sum, val) => sum + val, 0) / values.length;
 
 				// 计算标准差
-				const variance = values.reduce((sum, val) => sum + Math.pow(val - average, 2), 0) / values.length;
+				const variance = values.reduce((sum, val) => sum + Math.pow(val - average, 2), 0) / values
+					.length;
 				const stdDev = Math.sqrt(variance);
 
 				// 计算基础校正因子
@@ -527,7 +560,9 @@ export default {
 			// #ifdef H5
 			// 在H5中可以下载文件
 			const dataStr = JSON.stringify(exportData, null, 2);
-			const dataBlob = new Blob([dataStr], { type: 'application/json' });
+			const dataBlob = new Blob([dataStr], {
+				type: 'application/json'
+			});
 			const url = URL.createObjectURL(dataBlob);
 			const link = document.createElement('a');
 			link.href = url;
@@ -606,13 +641,16 @@ export default {
 
 .input-row {
 	display: flex;
-	gap: 20rpx;
 }
 
 .input-item {
 	flex: 1;
 	display: flex;
 	flex-direction: column;
+}
+
+.mr-20 {
+	margin-right: 20rpx;
 }
 
 .input-label {
@@ -703,6 +741,40 @@ export default {
 	color: #ffffff;
 	border: none;
 	border-radius: 8rpx;
+	font-size: 24rpx;
+}
+
+.bluetooth-device-list {
+	display: flex;
+	flex-direction: column;
+	height: 400rpx;
+	background-color: #f8f9fa;
+	border-radius: 8rpx;
+	padding: 0 20rpx;
+	overflow-y: auto;
+	margin-bottom: 20rpx;
+}
+
+.bluetooth-device-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding-left: 10rpx;
+	margin: 20rpx 0;
+	background-color: #fff;
+}
+
+.bluetooth-name {
+	flex: 1;
+	font-size: 24rpx;
+	color: #666666;
+}
+
+.connect-btn {
+	height: 60rpx;
+	padding: 0 20rpx;
+	background-color: #007aff;
+	color: #ffffff;
 	font-size: 24rpx;
 }
 </style>

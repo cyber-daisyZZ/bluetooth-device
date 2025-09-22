@@ -68,14 +68,6 @@ class BluetoothManager {
       // #ifdef APP-PLUS
       // Android 权限检查
       if (uni.getSystemInfoSync().platform === "android") {
-        const permissions = [
-          "android.permission.BLUETOOTH",
-          "android.permission.BLUETOOTH_ADMIN",
-          "android.permission.ACCESS_FINE_LOCATION",
-        ];
-
-        // 这里可以添加权限检查逻辑
-        // 由于不同平台的权限API差异较大，这里简化处理
         resolve();
       } else {
         resolve();
@@ -89,34 +81,32 @@ class BluetoothManager {
   }
 
   // 扫描蓝牙设备
-  scanDevices() {
+  scanDevices(cb) {
     return new Promise((resolve, reject) => {
       // #ifdef APP-PLUS
-      // 这里可以添加设备扫描逻辑
-      // 由于不同平台的蓝牙API差异较大，这里简化处理
-      uni.getSystemInfo({
-        success: (res) => {
-          if (res.platform === "android") {
-            uni.startBluetoothDevicesDiscovery({
-              success: (res) => {
-                console.log(res);
-              },
-            });
-          } else if (res.platform === "ios") {
-            uni.startBluetoothDevicesDiscovery({
-              success: (res) => {
-                console.log(res);
-              },
-            });
-          }
+      uni.openBluetoothAdapter({
+        success: () => {
+          uni.startBluetoothDevicesDiscovery({
+            success: () => {
+              uni.onBluetoothDeviceFound((res) => {
+                cb(res.devices[0], resolve, reject);
+              });
+            },
+            fail: (error) => {
+              reject(error);
+            },
+          });
         },
         fail: (error) => {
+          console.error("初始化蓝牙失败", error);
+          // 提示用户开启蓝牙权限
+          uni.showModal({
+            title: "提示",
+            content: "请先开启蓝牙",
+            showCancel: false,
+          });
           reject(error);
         },
-      });
-      uni.onBluetoothDeviceFound((res) => {
-        console.log(res);
-        resolve(res.devices);
       });
       // #endif
 
@@ -149,22 +139,28 @@ class BluetoothManager {
   }
 
   // 连接蓝牙设备
-  connectDevice(gatt) {
+  connectDevice(device) {
     return new Promise((resolve, reject) => {
       // #ifdef APP-PLUS
-      // 模拟连接过程
-      setTimeout(() => {
-        this.setDevice({ id: deviceId, name: "蓝牙传感器", gatt: {} });
-        resolve({
-          success: true,
-          deviceId: deviceId,
-          deviceName: "蓝牙传感器",
-        });
-      }, 2000);
+      uni.createBLEConnection({
+        deviceId: device.deviceId,
+        success(res) {
+          console.log(res);
+          resolve({
+            success: true,
+            deviceId: device.deviceId,
+            name: device.name,
+          });
+        },
+        fail(err) {
+          console.error(err);
+          reject(err);
+        },
+      });
       // #endif
 
       // #ifdef H5
-      gatt
+      device.gatt
         .connect()
         .then(({ device, gatt_ }) => {
           this.setDevice({
@@ -261,7 +257,9 @@ class BluetoothManager {
       // 模拟写入数据
       setTimeout(() => {
         console.log("写入数据:", data);
-        resolve({ success: true });
+        resolve({
+          success: true,
+        });
       }, 500);
       // #endif
 
@@ -289,7 +287,9 @@ class BluetoothManager {
       // 模拟发送命令
       setTimeout(() => {
         console.log("发送命令:", commandType, command);
-        resolve({ success: true });
+        resolve({
+          success: true,
+        });
       }, 500);
       // #endif
 
