@@ -1,32 +1,34 @@
 <template>
 	<view class="device-container">
+		<!-- 连接设备 -->
+		<button class="primary-btn" v-if="!isBluetoothConnected" @click="handleConnectBluetooth">
+			连接设备
+		</button>
+		<view v-if="isBluetoothConnected" class="device-info">
+			<text class="device-name flex-1">已连接: {{ bluetoothDeviceName }}</text>
+			<button class="disconnect-btn" @click="handleDisconnect">断开连接</button>
+		</view>
+		<view v-if="showScanDeviceList" class="bluetooth-device-list">
+			<view v-for="device in scanDeviceList" :key="device.id" class="bluetooth-device-item">
+				<text class="bluetooth-name">{{ device.name || device.deviceId }}</text>
+				<button class="connect-btn" @click="selectScanDevice(device)">连接</button>
+			</view>
+		</view>
 		<!-- 浓度数据 -->
-		<view class="section">
+		<!-- 	<view class="section">
 			<view class="section-header">
 				<view class="blue-bar"></view>
 				<text class="section-title">浓度数据</text>
 			</view>
 			<view class="section-content">
-				<button class="action-btn" :class="{ 'disabled': !isBluetoothConnected }" @click="handleStartReading">
-					{{ isBluetoothConnected ? '开始读取' : '连接蓝牙设备' }}
-				</button>
-				<view v-if="isBluetoothConnected" class="device-info">
-					<text class="device-name">已连接: {{ bluetoothDeviceName }}</text>
-					<button class="disconnect-btn" @click="handleDisconnect">断开连接</button>
-				</view>
-				<view v-if="showScanDeviceList" class="bluetooth-device-list">
-					<view v-for="device in scanDeviceList" :key="device.id" class="bluetooth-device-item">
-						<text class="bluetooth-name">{{ device.name || device.deviceId }}</text>
-						<button class="connect-btn" @click="selectScanDevice(device)">连接</button>
-					</view>
-				</view>
+			
 				<view class="data-display">
 					<text class="label">浓度值 (C0):</text>
 					<text class="value">{{ concentrationValue }}</text>
 				</view>
 				<button v-if="isBluetoothConnected" class="action-btn" @click="getDeviceService">获取设备服务</button>
 			</view>
-		</view>
+		</view> -->
 
 		<!-- 基础数据 -->
 		<view class="section">
@@ -34,42 +36,69 @@
 				<view class="blue-bar"></view>
 				<text class="section-title">基础数据</text>
 			</view>
-			<view class="section-content">
-				<view class="subsection">
-					<text class="subsection-title">分组</text>
-					<view class="input-grid">
-						<view class="input-row">
-							<view class="input-item mr-20">
-								<text class="input-label">C01</text>
-								<input v-model="groupData.C01" class="input-field" type="number" placeholder="0" />
-							</view>
-							<view class="input-item">
-								<text class="input-label">C02</text>
-								<input v-model="groupData.C02" class="input-field" type="number" placeholder="0" />
-							</view>
-						</view>
-						<view class="input-row">
-							<view class="input-item mr-20">
-								<text class="input-label">C03</text>
-								<input v-model="groupData.C03" class="input-field" type="number" placeholder="0" />
-							</view>
-							<view class="input-item">
-								<text class="input-label">C04</text>
-								<input v-model="groupData.C04" class="input-field" type="number" placeholder="0" />
-							</view>
-						</view>
-						<view class="input-row">
-							<view class="input-item mr-20">
-								<text class="input-label">C05</text>
-								<input v-model="groupData.C05" class="input-field" type="number" placeholder="0" />
-							</view>
-							<view class="input-item">
-								<text class="input-label">C06</text>
-								<input v-model="groupData.C06" class="input-field" type="number" placeholder="0" />
-							</view>
+			<view class="add-group">
+				<view class="flex-1 mr-20">
+					<view class="input-with-clear">
+						<input v-model="groupName" class="primary-input w-full" placeholder="请输入分组名称" />
+						<view v-if="groupName" class="clear-btn" @click="clearGroupName">
+							×
 						</view>
 					</view>
 				</view>
+				<button class="primary-btn w-30p" @click="handleAddGroup">
+					添加分组
+				</button>
+			</view>
+
+
+			<view class="section-content">
+				<button class="primary-btn" :class="{ 'disabled': !isBluetoothConnected, 'loading': isReading }"
+					@click="handleStartReading">开始读取</button>
+			</view>
+
+
+			<view class="subsection group" v-for="(group, index) in groups" :key="index"
+				:class="{ 'active': activeGroupIndex === index }" @click="handleActiveGroup(index)">
+				<view class="group-header">
+					<text class='group-name'>{{ group.name }}</text>
+					<text class="link-btn del-group" @click="handleRemoveGroup(index)">
+						删除
+					</text>
+				</view>
+				<view class="input-row">
+					<view class="input-item mr-20">
+						<text class="input-label">C01</text>
+						<input v-model="group.data.C01" class="input-field" type="number" placeholder="0" />
+					</view>
+					<view class="input-item">
+						<text class="input-label">C02</text>
+						<input v-model="group.data.C02" class="input-field" type="number" placeholder="0" />
+					</view>
+				</view>
+				<view class="input-row">
+					<view class="input-item mr-20">
+						<text class="input-label">C03</text>
+						<input v-model="group.data.C03" class="input-field" type="number" placeholder="0" />
+					</view>
+					<view class="input-item">
+					</view>
+				</view>
+			</view>
+		</view>
+
+
+		<!-- 备注 -->
+
+		<view class="section">
+			<textarea @blur="bindTextAreaBlur"
+				style="width: 100%; height: 200rpx; border: 1px solid #e9ecef; border-radius: 16rpx; padding: 10rpx; background-color: #F8F8F8;	font-size: 24rpx;"
+				placeholder="请输入备注" />
+		</view>
+
+		<view style="height: 2rpx;width: 100%;background-color: #ccc;margin: 20px auto 30rpx;"></view>
+
+		<view class="flex"  style="align-items: center;">
+			<view class="flex-1 mr-20">
 				<view class="data-display">
 					<text class="label">时间:</text>
 					<text class="value">{{ currentTime }}</text>
@@ -78,12 +107,15 @@
 					<text class="label">GPS:</text>
 					<text class="value">{{ gpsLocation }}</text>
 				</view>
-				<view v-if="gpsError" class="data-display">
-					<text class="label">GPS ERROR</text>
-					<text class="value" @click="initGPS">{{ gpsError }}</text>
-				</view>
 			</view>
+			<button class="primary-btn" @click="() => { initGPS(); updateTime() }">刷新</button>
 		</view>
+		<view v-if="gpsError" class="data-display">
+			<text class="label">GPS ERROR</text>
+			<text class="value" @click="initGPS">{{ gpsError }}</text>
+		</view>
+
+		<view style="height: 2rpx;width: 100%;background-color: #ccc;margin: 16px auto 10rpx;"></view>
 
 		<!-- 校正因子 -->
 		<view class="section">
@@ -92,15 +124,22 @@
 				<text class="section-title">校正因子</text>
 			</view>
 			<view class="section-content">
-				<button class="action-btn" @click="handleStartCalculation">开始计算</button>
-				<view class="data-display">
-					<text class="label">校正因子:</text>
-					<text class="value">{{ correctionFactor }}</text>
+				<view class="flex">
+					<button class="primary-btn mr-20" @click="handleStartCalculation">计算校正因子</button>
+					<view class="data-display flex-1">
+						<text class="label">校正因子:</text>
+						<text class="value">{{ correctionFactor }}</text>
+					</view>
 				</view>
-				<button class="action-btn" @click="handleSubmitCorrection">提交校正因子</button>
-				<view class="data-display">
-					<text class="label">提交结果:</text>
-					<text class="value" :class="{ 'success': submitResult === '成功' }">{{ submitResult }}</text>
+			</view>
+
+			<view class="section-content">
+				<view class="flex">
+					<button class="primary-btn mr-20" @click="handleSubmitCorrection">提交校正因子</button>
+					<view class="data-display flex-1">
+						<text class="label">提交结果:</text>
+						<text class="value" :class="{ 'success': submitResult === '成功' }">{{ submitResult }}</text>
+					</view>
 				</view>
 			</view>
 		</view>
@@ -108,7 +147,8 @@
 		<!-- 导出数据 -->
 		<view class="section">
 			<view class="section-content">
-				<button class="action-btn" @click="handleExportData">导出数据</button>
+				<button class="primary-btn" style="height: 100rpx;font-size: 32rpx;line-height: 100rpx;"
+					@click="handleExportData">导出数据</button>
 			</view>
 		</view>
 	</view>
@@ -129,14 +169,10 @@ export default {
 			concentrationValue: 0,
 
 			// 基础数据
-			groupData: {
-				C01: '',
-				C02: '',
-				C03: '',
-				C04: '',
-				C05: '',
-				C06: ''
-			},
+			isReading: false,
+			groupName: '',
+			groups: [],
+			activeGroupIndex: 0,
 
 			// 时间
 			currentTime: '',
@@ -179,12 +215,58 @@ export default {
 		}
 	},
 	methods: {
+		handleAddGroup() {
+			if (!this.groupName) {
+				uni.showToast({
+					title: '请输入分组名称',
+					icon: 'none'
+				});
+				return;
+			}
+			if (this.groups.find(group => group.name === this.groupName)) {
+				uni.showToast({
+					title: '分组名称已存在',
+					icon: 'none'
+				});
+				return;
+			}
+			this.groups.push({
+				name: this.groupName,
+				data: {
+					C01: '',
+					C02: '',
+					C03: ''
+				}
+			});
+			this.activeGroupIndex = this.groups.length - 1;
+			this.groupName = '';
+		},
+		handleActiveGroup(index) {
+			this.activeGroupIndex = index;
+		},
+		handleRemoveGroup(index) {
+			uni.showModal({
+				title: '删除分组',
+				content: '确定删除该分组吗？',
+				success: (res) => {
+					if (res.confirm) {
+						this.groups.splice(index, 1);
+						this.activeGroupIndex = this.groups.length - 1;
+					}
+				}
+			});
+		},
+
+		handleConnectBluetooth() {
+			this.connectBluetooth();
+		},
+
 		// 初始化时间显示
 		initTime() {
 			this.updateTime();
-			this.timeInterval = setInterval(() => {
-				this.updateTime();
-			}, 1000);
+			// this.timeInterval = setInterval(() => {
+			// 	this.updateTime();
+			// }, 1000);
 		},
 
 		// 更新时间
@@ -213,19 +295,6 @@ export default {
 					this.gpsLocation = 'GPS获取失败';
 				}
 			});
-
-			// 持续监听位置变化
-			uni.startLocationUpdate({
-				success: () => {
-					uni.onLocationChange((res) => {
-						this.updateGPSLocation(res.latitude, res.longitude);
-					});
-				},
-				fail: (err) => {
-					console.log('GPS监听启动失败:', err);
-					this.gpsError = err;
-				}
-			});
 			// #endif
 
 			// #ifdef H5
@@ -250,7 +319,7 @@ export default {
 			const lngDeg = Math.floor(longitude);
 			const lngMin = Math.floor((longitude - lngDeg) * 60);
 
-			this.gpsLocation = `北纬${latDeg}度${latMin}分,东经${lngDeg}度${lngMin}分`;
+			this.gpsLocation = `北纬${latDeg}.${latMin},东经${lngDeg}.${lngMin}`;
 			this.gpsError = '';
 		},
 
@@ -270,11 +339,21 @@ export default {
 
 		// 处理开始读取
 		handleStartReading() {
-			if (!this.isBluetoothConnected) {
-				this.connectBluetooth();
-			} else {
-				this.startReadingData();
+			if (this.groups.length === 0) {
+				uni.showToast({
+					title: '请先添加分组',
+					icon: 'none'
+				});
+				return;
 			}
+			if (!this.isBluetoothConnected) {
+				uni.showToast({
+					title: '请先连接设备',
+					icon: 'none'
+				});
+				return;
+			}
+			this.startReadingData();
 		},
 
 		selectScanDevice(device) {
@@ -295,18 +374,24 @@ export default {
 				});
 
 				// 扫描蓝牙设备
-				const devices = await bluetoothManager.scanDevices((device, resolve, reject) => {
-					this.scanDeviceList.push(device);
-					uni.hideLoading();
-					this.showScanDeviceList = true;
-					this.scanResolve = resolve;
-					this.scanReject = reject;
-				});
-				this.deviceList = devices;
-
+				// const devices = await bluetoothManager.scanDevices((device, resolve, reject) => {
+				// 	this.scanDeviceList.push(device);
+				// 	uni.hideLoading();
+				// 	this.showScanDeviceList = true;
+				// 	this.scanResolve = resolve;
+				// 	this.scanReject = reject;
+				// });
+				// this.deviceList = devices;
+				this.deviceList = [
+					{
+						name: '测试设备',
+						deviceId: 'test-device'
+					}
+				];
+				await new Promise(resolve => setTimeout(resolve, 1000));
 				uni.hideLoading();
-
-				if (devices.length === 0) {
+				console.log(this.deviceList)
+				if (this.deviceList.length === 0) {
 					uni.showModal({
 						title: '蓝牙连接',
 						content: '未找到可用的蓝牙设备，请确保设备已开启并处于可发现状态',
@@ -331,7 +416,7 @@ export default {
 		// 显示设备选择
 		showDeviceSelection() {
 			const deviceNames = this.deviceList.map(device => device.name || device.deviceId);
-
+			console.log(deviceNames)
 			uni.showActionSheet({
 				itemList: deviceNames,
 				success: (res) => {
@@ -351,8 +436,13 @@ export default {
 					title: '连接中...'
 				});
 
-				const result = await bluetoothManager.connectDevice(device);
-
+				// const result = await bluetoothManager.connectDevice(device);
+				await new Promise(resolve => setTimeout(resolve, 1000));
+				const result = {
+					success: true,
+					deviceId: device.deviceId,
+					name: device.name
+				};
 				uni.hideLoading();
 
 				if (result.success) {
@@ -404,13 +494,19 @@ export default {
 				});
 
 				// 从蓝牙设备读取数据
-				const data = await bluetoothManager.readData();
+				// const data = await bluetoothManager.readData();
+				await new Promise(resolve => setTimeout(resolve, 1000));
+				const data = {
+					concentration: 100,
+					temperature: 20.0,
+					humidity: 40.0,
+					timestamp: new Date().getTime()
+				};
 
 				uni.hideLoading();
-
-				// 更新浓度值
-				this.concentrationValue = data.concentration;
-
+				this.groups[this.activeGroupIndex].data.C01 = data.concentration;
+				this.groups[this.activeGroupIndex].data.C02 = data.temperature;
+				this.groups[this.activeGroupIndex].data.C03 = data.humidity;
 				// 可以选择性地更新其他数据
 				console.log('读取到的完整数据:', data);
 
@@ -459,18 +555,10 @@ export default {
 
 		// 开始计算
 		handleStartCalculation() {
-			// 验证浓度数据
-			if (!this.concentrationValue || this.concentrationValue <= 0) {
-				uni.showToast({
-					title: '请先读取浓度数据',
-					icon: 'none'
-				});
-				return;
-			}
-
 			// 验证分组数据
-			const validValues = Object.values(this.groupData).filter(value =>
-				value && !isNaN(value) && parseFloat(value) > 0
+			const validValues = this.groups.filter(group =>group.data.C01 && !isNaN(group.data.C01) && parseFloat(group.data.C01) > 0 &&
+				group.data.C02 && !isNaN(group.data.C02) && parseFloat(group.data.C02) > 0 &&
+				group.data.C03 && !isNaN(group.data.C03) && parseFloat(group.data.C03) > 0
 			);
 
 			if (validValues.length === 0) {
@@ -488,29 +576,7 @@ export default {
 			// 模拟计算过程
 			setTimeout(() => {
 				uni.hideLoading();
-
-				// 计算逻辑：
-				// 1. 计算分组数据的平均值
-				// 2. 计算标准差
-				// 3. 基于浓度值和平均值计算校正因子
-				// 4. 应用标准差进行修正
-
-				const values = validValues.map(v => parseFloat(v));
-				const average = values.reduce((sum, val) => sum + val, 0) / values.length;
-
-				// 计算标准差
-				const variance = values.reduce((sum, val) => sum + Math.pow(val - average, 2), 0) / values
-					.length;
-				const stdDev = Math.sqrt(variance);
-
-				// 计算基础校正因子
-				let baseCorrection = (average / this.concentrationValue) * 100;
-
-				// 应用标准差修正（标准差越小，校正因子越稳定）
-				const stabilityFactor = Math.max(0.8, 1 - (stdDev / average) * 0.5);
-				this.correctionFactor = Math.round(baseCorrection * stabilityFactor);
-
-				// 确保校正因子在合理范围内
+				this.correctionFactor = 100;
 				this.correctionFactor = Math.max(50, Math.min(200, this.correctionFactor));
 
 				uni.showToast({
@@ -535,6 +601,11 @@ export default {
 					icon: 'success'
 				});
 			}, 1000);
+		},
+
+		// 清空分组名称
+		clearGroupName() {
+			this.groupName = '';
 		},
 
 		// 导出数据
@@ -583,54 +654,58 @@ export default {
 <style lang="scss" scoped>
 .device-container {
 	padding: 20rpx;
-	background-color: #f5f5f5;
+	background-color: #ffffff;
 	min-height: 100vh;
 }
 
 .section {
 	background-color: #ffffff;
-	border-radius: 16rpx;
 	margin-bottom: 20rpx;
-	overflow: hidden;
-	box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.1);
 }
 
 .section-header {
 	display: flex;
 	align-items: center;
-	padding: 20rpx 30rpx;
-	background-color: #f8f9fa;
-	border-bottom: 1rpx solid #e9ecef;
+	padding: 20rpx 0rpx;
 }
 
 .blue-bar {
 	width: 8rpx;
-	height: 32rpx;
+	height: 30rpx;
 	background-color: #007aff;
-	border-radius: 4rpx;
+	// border-radius: 4rpx;
 	margin-right: 16rpx;
 }
 
 .section-title {
-	font-size: 32rpx;
+	font-size: 28rpx;
 	font-weight: 600;
 	color: #333333;
 }
 
 .section-content {
-	padding: 30rpx;
+	padding: 12rpx 0;
 }
 
 .subsection {
-	margin-bottom: 30rpx;
+	margin-top: 20rpx;
+	box-shadow: 0 0 10rpx 0 rgba(0, 0, 0, 0.1);
+	border-radius: 10rpx;
+	padding: 20rpx 0;
+	background-color: #fff;
 }
 
 .subsection-title {
-	font-size: 28rpx;
+	font-size: 26rpx;
 	font-weight: 500;
 	color: #666666;
 	margin-bottom: 20rpx;
 	display: block;
+}
+
+.subsection.group.active {
+	border: 1px solid #007aff;
+
 }
 
 .input-grid {
@@ -641,12 +716,14 @@ export default {
 
 .input-row {
 	display: flex;
+	margin-top: 20rpx;
+	padding: 0 20rpx;
 }
 
 .input-item {
-	flex: 1;
 	display: flex;
-	flex-direction: column;
+	align-items: center;
+	width: 50%;
 }
 
 .mr-20 {
@@ -656,26 +733,25 @@ export default {
 .input-label {
 	font-size: 24rpx;
 	color: #666666;
-	margin-bottom: 8rpx;
+	margin-right: 10rpx;
 }
 
 .input-field {
-	height: 80rpx;
+	height: 60rpx;
 	border: 2rpx solid #e9ecef;
-	border-radius: 8rpx;
+	border-radius: 16rpx;
 	padding: 0 20rpx;
 	font-size: 28rpx;
 	background-color: #ffffff;
 }
 
 .action-btn {
-	width: 100%;
-	height: 88rpx;
+	height: 60rpx;
 	background-color: #007aff;
 	color: #ffffff;
 	border: none;
 	border-radius: 12rpx;
-	font-size: 32rpx;
+	font-size: 28rpx;
 	font-weight: 500;
 	margin-bottom: 20rpx;
 	display: flex;
@@ -684,7 +760,7 @@ export default {
 
 	&.disabled {
 		background-color: #cccccc;
-		color: #999999;
+		color: #fff;
 	}
 
 	&:active {
@@ -703,14 +779,13 @@ export default {
 }
 
 .label {
-	font-size: 28rpx;
+	font-size: 24rpx;
 	color: #666666;
 	margin-right: 16rpx;
-	min-width: 160rpx;
 }
 
 .value {
-	font-size: 28rpx;
+	font-size: 24rpx;
 	color: #333333;
 	font-weight: 500;
 
@@ -722,7 +797,6 @@ export default {
 .device-info {
 	display: flex;
 	align-items: center;
-	justify-content: space-between;
 	margin-bottom: 20rpx;
 	padding: 16rpx;
 	background-color: #f8f9fa;
@@ -732,6 +806,9 @@ export default {
 .device-name {
 	font-size: 24rpx;
 	color: #666666;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .disconnect-btn {
@@ -776,5 +853,61 @@ export default {
 	background-color: #007aff;
 	color: #ffffff;
 	font-size: 24rpx;
+}
+
+.add-group {
+	display: flex;
+}
+
+.input-with-clear {
+	position: relative;
+	display: flex;
+	align-items: center;
+}
+
+.input-with-clear .primary-input {
+	padding-right: 60rpx;
+	/* 为清空按钮留出空间 */
+}
+
+.clear-btn {
+	position: absolute;
+	right: 15rpx;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 30rpx;
+	height: 30rpx;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background-color: #cccccc;
+	color: #ffffff;
+	border-radius: 50%;
+	font-size: 24rpx;
+	font-weight: bold;
+	cursor: pointer;
+	z-index: 10;
+
+	&:active {
+		background-color: #999999;
+	}
+}
+
+.group-header {
+	display: flex;
+	align-items: center;
+	padding: 0 20rpx 20rpx;
+	margin-bottom: 10rpx;
+	border-bottom: 1px solid #eee;
+
+
+}
+
+.group-name {
+	font-size: 24rpx;
+}
+
+.del-group {
+	margin-left: auto;
 }
 </style>
