@@ -1,154 +1,181 @@
 <template>
 	<view class="device-container">
-		<!-- 连接设备 -->
-		<button class="primary-btn" v-if="!isBluetoothConnected" @click="handleConnectBluetooth">
-			连接设备
-		</button>
-		<view v-if="isBluetoothConnected" class="device-info">
-			<text class="device-name flex-1">已连接: {{ bluetoothDeviceName }}</text>
-			<button class="disconnect-btn" @click="handleDisconnect">断开连接</button>
+		<view v-if="!isBluetoothConnected" class="connection-section">
+			<button class="primary-btn connection-btn" @click="handleConnectBluetooth">
+				<text>{{ showScanDeviceList ? '取消搜索' : '搜索设备' }}</text>
+			</button>
 		</view>
-		<view v-if="showScanDeviceList" class="bluetooth-device-list">
-			<view v-for="device in scanDeviceList" :key="device.id" class="bluetooth-device-item">
-				<text class="bluetooth-name">{{ device.name || device.deviceId }}</text>
-				<button class="connect-btn" @click="selectScanDevice(device)">连接</button>
+		<view v-if="isBluetoothConnected" class="connected-section">
+			<view class="device-status">
+				<view class="status-indicator connected"></view>
+				<text class="device-name">已连接: {{ bluetoothDeviceName }}</text>
 			</view>
+			<button class="disconnect-btn" @click="handleDisconnect">
+				<text>断开连接</text>
+			</button>
 		</view>
-		<!-- 浓度数据 -->
-		<!-- 	<view class="section">
-			<view class="section-header">
-				<view class="blue-bar"></view>
-				<text class="section-title">浓度数据</text>
+
+		<!-- 设备列表 -->
+		<view v-if="showScanDeviceList" class="card device-list-card">
+			<view class="card-header">
+				<text class="card-title">可用设备</text>
 			</view>
-			<view class="section-content">
-			
-				<view class="data-display">
-					<text class="label">浓度值 (C0):</text>
-					<text class="value">{{ concentrationValue }}</text>
+			<scroll-view scroll-y="true" class="device-list">
+				<view v-for="device in scanDeviceListComputed" :key="device.id" class="device-item">
+					<view class="device-info">
+						<text class="device-name">{{ device.name || device.deviceId }}</text>
+					</view>
+					<button class="connect-device-btn" @click="selectScanDevice(device)">
+						<text>连接</text>
+					</button>
 				</view>
-				<button v-if="isBluetoothConnected" class="action-btn" @click="getDeviceService">获取设备服务</button>
-			</view>
-		</view> -->
+			</scroll-view>
+		</view>
+	
 
 		<!-- 基础数据 -->
-		<view class="section">
-			<view class="section-header">
-				<view class="blue-bar"></view>
-				<text class="section-title">基础数据</text>
+		<view class="card data-card">
+			<view class="card-header">
+				<text class="card-title">基础数据</text>
 			</view>
-			<view class="add-group">
-				<view class="flex-1 mr-20">
-					<view class="input-with-clear">
-						<input v-model="groupName" class="primary-input w-full" placeholder="请输入分组名称" />
-						<view v-if="groupName" class="clear-btn" @click="clearGroupName">
-							×
+			<view class="card-content">
+				<!-- 添加分组区域 -->
+				<view class="add-group-section">
+					<view class="input-group">
+						<view class="input-with-clear">
+							<input v-model="groupName" class="group-input" placeholder="请输入分组名称" />
+							<view v-if="groupName" class="clear-btn" @click="clearGroupName">×</view>
+						</view>
+						<button class="add-group-btn" @click="handleAddGroup">
+							<text>添加分组</text>
+						</button>
+					</view>
+				</view>
+
+				<!-- 读取按钮 -->
+				<view class="action-section">
+					<button class="primary-btn read-btn"
+						:class="{ 'disabled': !isBluetoothConnected, 'loading': isReading }"
+						@click="handleStartReading">
+						<text>{{ isReading ? '读取中...' : '开始读取' }}</text>
+					</button>
+				</view>
+
+				<!-- 分组列表 -->
+				<view class="groups-section" v-if="groups.length > 0">
+					<view class="group-item" v-for="(group, index) in groups" :key="index"
+						:class="{ 'active': activeGroupIndex === index }" @click="handleActiveGroup(index)">
+						<view class="group-header">
+							<view class="group-info">
+								<text class="group-name">{{ group.name }}</text>
+							</view>
+							<button class="delete-group-btn" @click.stop="handleRemoveGroup(index)">
+								<text style="font-size: 24rpx;color: #fff;">删除</text>
+							</button>
+						</view>
+						<view class="group-content">
+							<view class="data-grid">
+								<view class="data-item">
+									<text class="data-label">C01</text>
+									<input v-model="group.data.C01" class="data-input" type="number" placeholder="0" />
+								</view>
+								<view class="data-item">
+									<text class="data-label">C02</text>
+									<input v-model="group.data.C02" class="data-input" type="number" placeholder="0" />
+								</view>
+								<view class="data-item">
+									<text class="data-label">C03</text>
+									<input v-model="group.data.C03" class="data-input" type="number" placeholder="0" />
+								</view>
+							</view>
 						</view>
 					</view>
 				</view>
-				<button class="primary-btn w-30p" @click="handleAddGroup">
-					添加分组
+			</view>
+		</view>
+
+
+		<!-- 备注和时间信息 -->
+		<view class="card info-card">
+			<view class="card-header">
+				<text class="card-title">备注信息</text>
+			</view>
+			<view class="card-content">
+				<textarea class="note-textarea" placeholder="请输入备注信息..." />
+			</view>
+		</view>
+
+		<!-- 时间和位置信息 -->
+		<view class="card location-card">
+			<view class="card-header">
+				<text class="card-title">时间与位置</text>
+			</view>
+			<view class="card-content">
+				<view class="info-grid">
+					<view class="info-item">
+						<view class="info-content">
+							<text class="info-label">当前时间</text>
+							<text class="info-value">{{ currentTime }}</text>
+						</view>
+					</view>
+					<view class="info-item">
+						<view class="info-content">
+							<text class="info-label">GPS位置</text>
+							<text class="info-value">{{ gpsLocation }}</text>
+						</view>
+					</view>
+				</view>
+				<view v-if="gpsError" class="error-section">
+					<text class="error-text" @click="initGPS">{{ gpsError }}</text>
+				</view>
+				<button class="refresh-btn" @click="() => { initGPS(); updateTime() }">
+					<text>刷新信息</text>
 				</button>
 			</view>
-
-
-			<view class="section-content">
-				<button class="primary-btn" :class="{ 'disabled': !isBluetoothConnected, 'loading': isReading }"
-					@click="handleStartReading">开始读取</button>
-			</view>
-
-
-			<view class="subsection group" v-for="(group, index) in groups" :key="index"
-				:class="{ 'active': activeGroupIndex === index }" @click="handleActiveGroup(index)">
-				<view class="group-header">
-					<text class='group-name'>{{ group.name }}</text>
-					<text class="link-btn del-group" @click="handleRemoveGroup(index)">
-						删除
-					</text>
-				</view>
-				<view class="input-row">
-					<view class="input-item mr-20">
-						<text class="input-label">C01</text>
-						<input v-model="group.data.C01" class="input-field" type="number" placeholder="0" />
-					</view>
-					<view class="input-item">
-						<text class="input-label">C02</text>
-						<input v-model="group.data.C02" class="input-field" type="number" placeholder="0" />
-					</view>
-				</view>
-				<view class="input-row">
-					<view class="input-item mr-20">
-						<text class="input-label">C03</text>
-						<input v-model="group.data.C03" class="input-field" type="number" placeholder="0" />
-					</view>
-					<view class="input-item">
-					</view>
-				</view>
-			</view>
 		</view>
-
-
-		<!-- 备注 -->
-
-		<view class="section">
-			<textarea @blur="bindTextAreaBlur"
-				style="width: 100%; height: 200rpx; border: 1px solid #e9ecef; border-radius: 16rpx; padding: 10rpx; background-color: #F8F8F8;	font-size: 24rpx;"
-				placeholder="请输入备注" />
-		</view>
-
-		<view style="height: 2rpx;width: 100%;background-color: #ccc;margin: 20px auto 30rpx;"></view>
-
-		<view class="flex"  style="align-items: center;">
-			<view class="flex-1 mr-20">
-				<view class="data-display">
-					<text class="label">时间:</text>
-					<text class="value">{{ currentTime }}</text>
-				</view>
-				<view class="data-display">
-					<text class="label">GPS:</text>
-					<text class="value">{{ gpsLocation }}</text>
-				</view>
-			</view>
-			<button class="primary-btn" @click="() => { initGPS(); updateTime() }">刷新</button>
-		</view>
-		<view v-if="gpsError" class="data-display">
-			<text class="label">GPS ERROR</text>
-			<text class="value" @click="initGPS">{{ gpsError }}</text>
-		</view>
-
-		<view style="height: 2rpx;width: 100%;background-color: #ccc;margin: 16px auto 10rpx;"></view>
 
 		<!-- 校正因子 -->
-		<view class="section">
-			<view class="section-header">
-				<view class="blue-bar"></view>
-				<text class="section-title">校正因子</text>
+		<view class="card correction-card">
+			<view class="card-header">
+				<text class="card-title">校正因子</text>
 			</view>
-			<view class="section-content">
-				<view class="flex">
-					<button class="primary-btn mr-20" @click="handleStartCalculation">计算校正因子</button>
-					<view class="data-display flex-1">
-						<text class="label">校正因子:</text>
-						<text class="value">{{ correctionFactor }}</text>
+			<view class="card-content">
+				<view class="correction-section">
+					<view class="correction-action">
+						<button class="primary-btn correction-btn" @click="handleStartCalculation">
+							<text>计算校正因子</text>
+						</button>
+						<view class="correction-result">
+							<text class="result-label">校正因子:</text>
+							<text class="result-value">{{ correctionFactor }}</text>
+						</view>
 					</view>
 				</view>
-			</view>
 
-			<view class="section-content">
-				<view class="flex">
-					<button class="primary-btn mr-20" @click="handleSubmitCorrection">提交校正因子</button>
-					<view class="data-display flex-1">
-						<text class="label">提交结果:</text>
-						<text class="value" :class="{ 'success': submitResult === '成功' }">{{ submitResult }}</text>
+				<view class="submit-section">
+					<view class="submit-action">
+						<button class="primary-btn submit-btn" @click="handleSubmitCorrection">
+							<text>提交校正因子</text>
+						</button>
+						<view class="submit-result">
+							<text class="result-label">提交结果:</text>
+							<text class="result-value" :class="{ 'success': submitResult === '成功' }">{{ submitResult
+								}}</text>
+						</view>
 					</view>
 				</view>
 			</view>
 		</view>
 
 		<!-- 导出数据 -->
-		<view class="section">
-			<view class="section-content">
-				<button class="primary-btn" style="height: 100rpx;font-size: 32rpx;line-height: 100rpx;"
-					@click="handleExportData">导出数据</button>
+		<view class="card export-card">
+			<view class="card-header">
+				<text class="card-title">数据导出</text>
+			</view>
+			<view class="card-content">
+				<button class="export-btn" @click="handleExportData">
+					<text>导出数据</text>
+				</button>
 			</view>
 		</view>
 	</view>
@@ -156,6 +183,16 @@
 
 <script>
 import bluetoothManager from '@/utils/bluetooth.js'
+
+function ab2hex(buffer) {
+	const hexArr = Array.prototype.map.call(
+		new Uint8Array(buffer),
+		function (bit) {
+			return ('00' + bit.toString(16)).slice(-2)
+		}
+	)
+	return hexArr.join('')
+}
 
 export default {
 	data() {
@@ -198,6 +235,15 @@ export default {
 			showScanDeviceList: false,
 			scanResolve: null,
 			scanReject: null,
+		}
+	},
+	computed: {
+		scanDeviceListComputed() {
+			const filterObj = {}
+			this.scanDeviceList.forEach((device) => {
+				filterObj[device.deviceId] = device
+			})
+			return Object.values(filterObj)
 		}
 	},
 	onLoad() {
@@ -258,7 +304,13 @@ export default {
 		},
 
 		handleConnectBluetooth() {
-			this.connectBluetooth();
+			if (this.showScanDeviceList) {
+				uni.stopBluetoothDevicesDiscovery()
+				this.scanDeviceList = []
+				this.showScanDeviceList = false
+			} else {
+				this.connectBluetooth();
+			}
 		},
 
 		// 初始化时间显示
@@ -357,7 +409,7 @@ export default {
 		},
 
 		selectScanDevice(device) {
-			this.scanResolve([device]);
+			this.scanResolve(device);
 			this.showScanDeviceList = false;
 			this.scanDeviceList = [];
 			this.scanResolve = null;
@@ -369,64 +421,25 @@ export default {
 		async connectBluetooth() {
 			this.scanDeviceList = [];
 			try {
-				uni.showLoading({
-					title: '扫描设备中...'
+				const selectedDevice = await bluetoothManager.scanDevices((device) => {
+					this.scanDeviceList.push(...device);
+				}, (resolve, reject) => {
+					this.showScanDeviceList = true;
+					this.scanResolve = resolve;
+					this.scanReject = reject;
 				});
 
-				// 扫描蓝牙设备
-				// const devices = await bluetoothManager.scanDevices((device, resolve, reject) => {
-				// 	this.scanDeviceList.push(device);
-				// 	uni.hideLoading();
-				// 	this.showScanDeviceList = true;
-				// 	this.scanResolve = resolve;
-				// 	this.scanReject = reject;
-				// });
-				// this.deviceList = devices;
-				this.deviceList = [
-					{
-						name: '测试设备',
-						deviceId: 'test-device'
-					}
-				];
-				await new Promise(resolve => setTimeout(resolve, 1000));
-				uni.hideLoading();
-				console.log(this.deviceList)
-				if (this.deviceList.length === 0) {
-					uni.showModal({
-						title: '蓝牙连接',
-						content: '未找到可用的蓝牙设备，请确保设备已开启并处于可发现状态',
-						showCancel: false
-					});
-					return;
+				if(selectedDevice) {
+					this.connectToDevice(selectedDevice);
 				}
-				// 显示设备选择列表
-				this.showDeviceSelection();
 			} catch (error) {
-				uni.hideLoading();
 				console.log('蓝牙连接失败:', error);
-
 				uni.showModal({
 					title: '连接失败',
 					content: error,
 					showCancel: false
 				});
 			}
-		},
-
-		// 显示设备选择
-		showDeviceSelection() {
-			const deviceNames = this.deviceList.map(device => device.name || device.deviceId);
-			console.log(deviceNames)
-			uni.showActionSheet({
-				itemList: deviceNames,
-				success: (res) => {
-					const selectedDevice = this.deviceList[res.tapIndex];
-					this.connectToDevice(selectedDevice);
-				},
-				fail: () => {
-					console.log('用户取消选择设备');
-				}
-			});
 		},
 
 		// 连接到指定设备
@@ -556,7 +569,8 @@ export default {
 		// 开始计算
 		handleStartCalculation() {
 			// 验证分组数据
-			const validValues = this.groups.filter(group =>group.data.C01 && !isNaN(group.data.C01) && parseFloat(group.data.C01) > 0 &&
+			const validValues = this.groups.filter(group => group.data.C01 && !isNaN(group.data.C01) && parseFloat(
+				group.data.C01) > 0 &&
 				group.data.C02 && !isNaN(group.data.C02) && parseFloat(group.data.C02) > 0 &&
 				group.data.C03 && !isNaN(group.data.C03) && parseFloat(group.data.C03) > 0
 			);
@@ -654,58 +668,388 @@ export default {
 <style lang="scss" scoped>
 .device-container {
 	padding: 20rpx;
-	background-color: #ffffff;
+	background: linear-gradient(180deg, #f2f3f7 0%, #f2f3f7 100%);
 	min-height: 100vh;
 }
 
-.section {
-	background-color: #ffffff;
-	margin-bottom: 20rpx;
-}
-
-.section-header {
+/* 页面标题 */
+.page-header {
 	display: flex;
 	align-items: center;
-	padding: 20rpx 0rpx;
+	justify-content: center;
+	padding: 30rpx 0;
+	margin-bottom: 30rpx;
+	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+	border-radius: 20rpx;
+	box-shadow: 0 8rpx 32rpx rgba(102, 126, 234, 0.3);
 }
 
-.blue-bar {
-	width: 8rpx;
-	height: 30rpx;
-	background-color: #007aff;
-	// border-radius: 4rpx;
-	margin-right: 16rpx;
+.page-title {
+	font-size: 36rpx;
+	font-weight: 700;
+	color: #2e3a4d;
+	text-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.1);
 }
 
-.section-title {
+/* 卡片通用样式 */
+.card {
+	background: #ffffff;
+	border-radius: 20rpx;
+	margin: 30rpx 0;
+	box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.1);
+	overflow: hidden;
+	transition: all 0.3s ease;
+
+	&:hover {
+		transform: translateY(-4rpx);
+		box-shadow: 0 12rpx 40rpx rgba(0, 0, 0, 0.15);
+	}
+}
+
+.card-header {
+	display: flex;
+	align-items: center;
+	padding: 30rpx;
+	// background: linear-gradient(135deg, #c8e5ff 0%, #cdefff 100%);
+	color: #2e3a4d;
+}
+
+.card-title {
+	font-size: 32rpx;
+	font-weight: 600;
+	color: #2e3a4d;
+}
+
+.card-content {
+	padding: 30rpx;
+}
+
+/* 连接区域样式 */
+.connection-section {
+	text-align: center;
+}
+
+.connection-btn {
+	width: 100%;
+	height: 100rpx;
+	background: linear-gradient(135deg, #1a94ff 0%, #40B9FE 100%);
+	border-radius: 16rpx;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 32rpx;
+	font-weight: 600;
+	color: #ffffff;
+	border: none;
+	box-shadow: 0 4rpx 16rpx rgba(102, 126, 234, 0.3);
+	transition: all 0.3s ease;
+
+	&:active {
+		transform: scale(0.98);
+	}
+}
+
+.connected-section {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.device-status {
+	display: flex;
+	align-items: center;
+	flex: 1;
+}
+
+.status-indicator {
+	width: 20rpx;
+	height: 20rpx;
+	border-radius: 50%;
+	margin-right: 20rpx;
+
+	&.connected {
+		background: #4CAF50;
+		box-shadow: 0 0 10rpx rgba(76, 175, 80, 0.5);
+	}
+}
+
+.device-name {
 	font-size: 28rpx;
+	color: #333333;
+	font-weight: 500;
+}
+
+.disconnect-btn {
+	height: 80rpx;
+	padding: 0 30rpx;
+	background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+	color: #ffffff;
+	border: none;
+	border-radius: 12rpx;
+	font-size: 26rpx;
+	font-weight: 500;
+	display: flex;
+	align-items: center;
+	box-shadow: 0 4rpx 16rpx rgba(255, 107, 107, 0.3);
+	transition: all 0.3s ease;
+
+	&:active {
+		transform: scale(0.98);
+	}
+}
+
+/* 设备列表样式 */
+.device-list {
+	max-height: 600rpx;
+}
+
+.device-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12rpx 20rpx;
+	margin: 20rpx;
+	background: #f8f9fa;
+	border-radius: 16rpx;
+	border: 2rpx solid transparent;
+	transition: all 0.3s ease;
+
+	&:hover {
+		border-color: #667eea;
+		background: #f0f2ff;
+	}
+}
+
+.device-info {
+	display: flex;
+	align-items: center;
+	margin-right: 20rpx;
+	flex: 1;
+}
+
+.connect-device-btn {
+	height: 80rpx;
+	padding: 0 30rpx;
+	background: linear-gradient(135deg, #1a94ff 0%, #40B9FE 100%);
+	color: #ffffff;
+	border: none;
+	border-radius: 12rpx;
+	font-size: 26rpx;
+	font-weight: 500;
+	display: flex;
+	align-items: center;
+	box-shadow: 0 4rpx 16rpx rgba(102, 126, 234, 0.3);
+	transition: all 0.3s ease;
+
+	&:active {
+		transform: scale(0.98);
+	}
+}
+
+/* 基础数据样式 */
+.add-group-section {
+	margin-bottom: 30rpx;
+}
+
+.input-group {
+	display: flex;
+	gap: 20rpx;
+	align-items: center;
+}
+
+.input-with-clear {
+	position: relative;
+	flex: 1;
+}
+
+.group-input {
+	width: 100%;
+	height: 80rpx;
+	border: 2rpx solid #e9ecef;
+	border-radius: 16rpx;
+	padding: 0 50rpx 0 20rpx;
+	font-size: 28rpx;
+	background-color: #ffffff;
+	transition: all 0.3s ease;
+
+	&:focus {
+		border-color: #667eea;
+		box-shadow: 0 0 0 4rpx rgba(102, 126, 234, 0.1);
+	}
+}
+
+.clear-btn {
+	position: absolute;
+	right: 15rpx;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 40rpx;
+	height: 40rpx;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background-color: #cccccc;
+	color: #ffffff;
+	border-radius: 50%;
+	font-size: 24rpx;
+	font-weight: bold;
+	cursor: pointer;
+	transition: all 0.3s ease;
+
+	&:active {
+		background-color: #999999;
+		transform: translateY(-50%) scale(0.9);
+	}
+}
+
+.add-group-btn {
+	height: 80rpx;
+	padding: 0 30rpx;
+	background: linear-gradient(135deg, #1a94ff 0%, #40B9FE 100%);
+	color: #ffffff;
+	border: none;
+	border-radius: 16rpx;
+	font-size: 28rpx;
+	font-weight: 500;
+	display: flex;
+	align-items: center;
+	box-shadow: 0 4rpx 16rpx rgba(102, 126, 234, 0.3);
+	transition: all 0.3s ease;
+
+	&:active {
+		transform: scale(0.98);
+	}
+}
+
+.action-section {
+	margin-bottom: 30rpx;
+	text-align: center;
+}
+
+.read-btn {
+	width: 100%;
+	height: 100rpx;
+	background: linear-gradient(135deg, #1a94ff 0%, #40B9FE 100%);
+	border-radius: 16rpx;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 32rpx;
+	font-weight: 600;
+	color: #ffffff;
+	border: none;
+	box-shadow: 0 4rpx 16rpx rgba(102, 126, 234, 0.3);
+	transition: all 0.3s ease;
+
+	&.disabled {
+		background: #cccccc;
+		box-shadow: none;
+	}
+
+	&.loading {
+		background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+	}
+
+	&:active:not(.disabled) {
+		transform: scale(0.98);
+	}
+}
+
+.groups-section {
+	display: flex;
+	flex-direction: column;
+	gap: 20rpx;
+}
+
+.group-item {
+	background: #f8f9fa;
+	border-radius: 16rpx;
+	padding: 30rpx;
+	border: 2rpx solid transparent;
+	transition: all 0.3s ease;
+
+	&.active {
+		border-color: #1a94ff;
+		background: #f0f2ff;
+		box-shadow: 0 4rpx 16rpx rgba(16, 148, 255, 0.2);
+	}
+
+	&:hover {
+		border-color: #1a94ff;
+		background: #f0f2ff;
+	}
+}
+
+.group-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 30rpx;
+	padding-bottom: 20rpx;
+	border-bottom: 2rpx solid #e9ecef;
+}
+
+.group-info {
+	display: flex;
+	align-items: center;
+	flex: 1;
+}
+
+.group-name {
+	font-size: 32rpx;
 	font-weight: 600;
 	color: #333333;
 }
 
-.section-content {
-	padding: 12rpx 0;
+.delete-group-btn {
+	height: 60rpx;
+	padding: 0 20rpx;
+	background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+	color: #ffffff;
+	border: none;
+	border-radius: 12rpx;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	box-shadow: 0 4rpx 16rpx rgba(255, 107, 107, 0.3);
+	transition: all 0.3s ease;
+
+	&:active {
+		transform: scale(0.9);
+	}
 }
 
-.subsection {
-	margin-top: 20rpx;
-	box-shadow: 0 0 10rpx 0 rgba(0, 0, 0, 0.1);
-	border-radius: 10rpx;
-	padding: 20rpx 0;
-	background-color: #fff;
+.data-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 20rpx;
 }
 
-.subsection-title {
-	font-size: 26rpx;
-	font-weight: 500;
+.data-item {
+	display: flex;
+	flex-direction: column;
+	gap: 10rpx;
+}
+
+.data-label {
+	font-size: 24rpx;
 	color: #666666;
-	margin-bottom: 20rpx;
-	display: block;
+	font-weight: 500;
 }
 
-.subsection.group.active {
-	border: 1px solid #007aff;
+.data-input {
+	height: 80rpx;
+	border: 2rpx solid #e9ecef;
+	border-radius: 12rpx;
+	padding: 0 20rpx;
+	font-size: 28rpx;
+	background-color: #ffffff;
+	transition: all 0.3s ease;
 
+	&:focus {
+		border-color: #667eea;
+		box-shadow: 0 0 0 4rpx rgba(102, 126, 234, 0.1);
+	}
 }
 
 .input-grid {
@@ -795,9 +1139,9 @@ export default {
 }
 
 .device-info {
+	height: 80rpx;
 	display: flex;
 	align-items: center;
-	margin-bottom: 20rpx;
 	padding: 16rpx;
 	background-color: #f8f9fa;
 	border-radius: 8rpx;
@@ -822,13 +1166,11 @@ export default {
 }
 
 .bluetooth-device-list {
-	display: flex;
-	flex-direction: column;
-	height: 400rpx;
+	height: 600rpx;
 	background-color: #f8f9fa;
 	border-radius: 8rpx;
 	padding: 0 20rpx;
-	overflow-y: auto;
+	margin-top: 20rpx;
 	margin-bottom: 20rpx;
 }
 
@@ -837,19 +1179,26 @@ export default {
 	align-items: center;
 	justify-content: space-between;
 	padding-left: 10rpx;
+	border-radius: 8rpx;
+	height: 80rpx;
 	margin: 20rpx 0;
 	background-color: #fff;
+	overflow: hidden;
 }
 
 .bluetooth-name {
 	flex: 1;
 	font-size: 24rpx;
 	color: #666666;
+	padding: 20rpx 0;
 }
 
 .connect-btn {
-	height: 60rpx;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
 	padding: 0 20rpx;
+	height: 100%;
 	background-color: #007aff;
 	color: #ffffff;
 	font-size: 24rpx;
@@ -896,6 +1245,7 @@ export default {
 .group-header {
 	display: flex;
 	align-items: center;
+	justify-content: space-between;
 	padding: 0 20rpx 20rpx;
 	margin-bottom: 10rpx;
 	border-bottom: 1px solid #eee;
@@ -909,5 +1259,199 @@ export default {
 
 .del-group {
 	margin-left: auto;
+}
+
+/* 备注和位置信息样式 */
+.note-textarea {
+	width: 100%;
+	height: 200rpx;
+	border: 2rpx solid #e9ecef;
+	border-radius: 16rpx;
+	padding: 20rpx;
+	background-color: #f8f9fa;
+	font-size: 28rpx;
+	resize: none;
+	transition: all 0.3s ease;
+
+	&:focus {
+		border-color: #667eea;
+		box-shadow: 0 0 0 4rpx rgba(102, 126, 234, 0.1);
+		background-color: #ffffff;
+	}
+}
+
+.info-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 30rpx;
+	margin-bottom: 30rpx;
+}
+
+.info-item {
+	display: flex;
+	align-items: center;
+	padding: 30rpx;
+	background: #f8f9fa;
+	border-radius: 16rpx;
+	border: 2rpx solid transparent;
+	transition: all 0.3s ease;
+
+	&:hover {
+		border-color: #667eea;
+		background: #f0f2ff;
+	}
+}
+
+
+.info-content {
+	flex: 1;
+}
+
+.info-label {
+	font-size: 24rpx;
+	color: #666666;
+	margin-bottom: 10rpx;
+	display: block;
+}
+
+.info-value {
+	font-size: 28rpx;
+	color: #333333;
+	font-weight: 500;
+}
+
+.error-section {
+	display: flex;
+	align-items: center;
+	padding: 20rpx;
+	background: #fff3cd;
+	border: 2rpx solid #ffeaa7;
+	border-radius: 12rpx;
+	margin-bottom: 30rpx;
+}
+
+
+.error-text {
+	font-size: 26rpx;
+	color: #856404;
+	flex: 1;
+}
+
+.refresh-btn {
+	width: 100%;
+	height: 80rpx;
+	background: linear-gradient(135deg, #1a94ff 0%, #40B9FE 100%);
+	color: #ffffff;
+	border: none;
+	border-radius: 16rpx;
+	font-size: 28rpx;
+	font-weight: 500;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	box-shadow: 0 4rpx 16rpx rgba(16, 148, 255, 0.3);
+	transition: all 0.3s ease;
+
+	&:active {
+		transform: scale(0.98);
+	}
+}
+
+/* 校正因子样式 */
+.correction-section,
+.submit-section {
+	margin-bottom: 30rpx;
+}
+
+.correction-action,
+.submit-action {
+	display: flex;
+	align-items: center;
+	gap: 30rpx;
+}
+
+.correction-btn,
+.submit-btn {
+	height: 80rpx;
+	padding: 0 30rpx;
+	background: linear-gradient(135deg, #1a94ff 0%, #40B9FE 100%);
+	color: #ffffff;
+	border: none;
+	border-radius: 16rpx;
+	font-size: 28rpx;
+	font-weight: 500;
+	display: flex;
+	align-items: center;
+	box-shadow: 0 4rpx 16rpx rgba(102, 126, 234, 0.3);
+	transition: all 0.3s ease;
+
+	&:active {
+		transform: scale(0.98);
+	}
+}
+
+.correction-result,
+.submit-result {
+	flex: 1;
+	padding: 20rpx;
+	background: #f8f9fa;
+	border-radius: 12rpx;
+	border: 2rpx solid #e9ecef;
+}
+
+.result-label {
+	font-size: 24rpx;
+	color: #666666;
+	margin-bottom: 10rpx;
+	display: block;
+}
+
+.result-value {
+	font-size: 32rpx;
+	color: #333333;
+	font-weight: 600;
+
+	&.success {
+		color: #4CAF50;
+	}
+}
+
+/* 导出数据样式 */
+.export-btn {
+	width: 100%;
+	height: 120rpx;
+	background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+	color: #ffffff;
+	border: none;
+	border-radius: 20rpx;
+	font-size: 36rpx;
+	font-weight: 600;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	box-shadow: 0 8rpx 24rpx rgba(255, 107, 107, 0.3);
+	transition: all 0.3s ease;
+
+	&:active {
+		transform: scale(0.98);
+	}
+}
+
+
+/* 响应式布局 */
+@media (max-width: 750rpx) {
+	.info-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.data-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.correction-action,
+	.submit-action {
+		flex-direction: column;
+		align-items: stretch;
+	}
 }
 </style>
